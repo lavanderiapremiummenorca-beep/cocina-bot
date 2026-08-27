@@ -15,59 +15,46 @@ _MODEL_CANDIDATES = [
     "gemini-2.5-flash-lite", "gemini-2.0-flash-001", "gemini-1.5-flash",
 ]
 BGS = ["blue", "green", "orange", "purple", "teal", "red"]
-
-# Temas y formatos que rotan por dia para no repetir (anti "contenido inautentico")
+# TIPOS DE PLATO que rotan por dia (se usan como "a evitar hoy" para forzar variedad)
 TEMAS = [
-    "cortar cebolla sin llorar",
-    "el arroz en su punto",
-    "madurar y conservar el aguacate",
-    "pelar ajo rapido",
-    "la tortilla jugosa",
-    "ablandar la carne",
-    "aprovechar las sobras",
-    "cocer bien la pasta",
-    "masa de pizza rapida",
-    "congelar alimentos bien",
-    "salsas rapidas caseras",
-    "marinar la carne o el pescado",
-    "medir sin bascula",
-    "evitar que la comida se pegue",
-    "postres expres",
-    "batch cooking para la semana",
-    "trucos con el huevo",
-    "el pan casero facil",
-    "alinos para ensaladas",
-    "conservar hierbas frescas"
+    "pasta", "arroz", "pollo", "huevos", "cremas y sopas", "postres expres",
+    "tostas y bocadillos", "verduras", "legumbres", "pescado", "tortillas",
+    "ensaladas templadas", "salsas caseras", "desayunos", "meriendas dulces",
+    "cenas rapidas", "platos de una sola sarten", "aperitivos",
 ]
+# ESTILOS que se intercalan cada dia (una receta apetecible, no una lista de tips)
 FORMATOS = [
-    "mito vs realidad", "un dato sorprendente con ejemplo numerico",
-    "el error comun que casi todos cometen", "top 3 rapido",
-    "esto no te lo cuentan", "comparativa antes vs despues",
-    "una pregunta que pica la curiosidad y su respuesta",
+    "la receta rapida paso a paso, apetecible de principio a fin",
+    "que ceno hoy: una cena facil que resuelve el dia",
+    "el truco que sube de nivel un plato de siempre",
+    "una receta con pocos ingredientes (4 o 5) y mucho sabor",
+    "el clasico reinventado en version rapida",
+    "el plato que impresiona sin apenas esfuerzo",
 ]
 
 SCHEMA_INSTRUCCION = """
 Devuelve UNICAMENTE un JSON valido (sin texto alrededor) con esta forma exacta:
 {
-  "title": "titulo honesto y con gancho, max 90 caracteres, puede llevar 1 emoji y #shorts",
-  "description": "1-2 frases de valor + CTA.",
-  "hashtags": ["Shorts", "cocina", "trucos", "recetas"],  // 3 a 5, sin '#', el primero SIEMPRE 'Shorts'
-  "bg": "uno de: blue, green, orange, purple, teal, red",
-  "broll": "2-4 palabras EN INGLES para metraje de archivo (ej: 'cooking food kitchen')",
+  "title": "titulo apetecible y concreto, max 90 caracteres, puede llevar 1 emoji y #shorts",
+  "description": "1-2 frases que abran el apetito + invitar a guardar. Anade al final: 'Guardalo para cuando no sepas que cocinar.'",
+  "hashtags": ["Shorts", "receta", "cocina", "recetasfaciles"],  // 3 a 5, sin '#', el primero SIEMPRE 'Shorts'
+  "bg": "uno de: orange, red, green, teal (tonos calidos y apetecibles)",
+  "broll": "2-4 palabras EN INGLES del plato/accion (ej: 'pasta cooking closeup')",
+  "broll_list": ["3 o 4 planos apetecibles EN INGLES, en orden (ej: 'sizzling pan closeup', 'chopping fresh vegetables', 'plating finished dish steam')"],
   "ai_disclosure": false,
   "lines": [
-    {"voice": "frase corta que se narra (con numeros en palabras: 'cien euros', no '100')",
+    {"voice": "frase corta y apetecible (numeros en palabras: 'dos huevos', no '2')",
      "cap": "subtitulo MUY corto en pantalla (2-4 palabras, puede llevar cifras)"}
   ]
 }
-Reglas del guion:
-- Entre 10 y 13 lineas. Cada 'voice' es una frase corta y natural (el video debe durar 20-40 s).
-- La PRIMERA linea es el gancho: sin saludos ni intro, engancha en el primer segundo.
-- La ULTIMA linea es el CTA: invita a seguir ("Sigueme para cocinar mejor cada dia") o a comentar.
-- 'cap' nunca lleva emojis (la fuente no los dibuja). 'voice' escribe los numeros con letras.
-- Espanol, cercano y apetitoso. Pasos claros y utiles.
+Reglas del guion (formato 'Que ceno hoy'):
+- Entre 8 y 11 lineas. Guia una receta REAL y sencilla, paso a paso, de forma apetecible (el video dura 30-45 s).
+- NO ES UNA LISTA DE TIPS: es una receta o un plato que da hambre y se quiere guardar. Nada de 'sabias que' ni 'top 3 trucos'.
+- APERTURA (linea 1, VARIADA cada dia, nunca identica a la de ayer): arranca con el plato ya hecho o su promesa irresistible. Ej: 'Esta cena esta lista en diez minutos y sabe a gloria.'
+- CIERRE (ultima linea, VARIADO cada dia): invita a guardarlo. Ej: 'Guardalo para esta noche.'
+- Cantidades y pasos realistas y faciles de seguir. 'cap' sin emojis. 'voice' con numeros en letras.
+- Espanol de Espana, cercano y con ganas. Nada de consejo dietetico o medico.
 """
-
 def _run_seed():
     try:
         return int(os.environ.get("GITHUB_RUN_NUMBER", "0"))
@@ -149,7 +136,7 @@ def _validate(s):
         hs = ["Shorts"] + [h for h in hs if h.lower() != "shorts"]
     s["hashtags"] = hs[:5]
     assert s.get("title"), "sin titulo"
-    s.setdefault("description", "Truco de cocina en 30 segundos. Sigueme para cocinar mejor cada dia.")
+    s.setdefault("description", "Una cena facil y rica en menos de lo que crees. Guardalo para cuando no sepas que cocinar.")
     s["id"] = "ia-" + datetime.date.today().isoformat()
     s.pop("chart", None)
     return s
@@ -161,7 +148,7 @@ def generate():
     try:
         master = open(os.path.join(BASE, "PROMPT-MAESTRO.md"), encoding="utf-8").read()
     except Exception:
-        master = "Eres un productor experto de YouTube Shorts de cocina y trucos en espanol."
+        master = "Eres un cocinero creativo de YouTube Shorts en espanol que hace recetas rapidas, apetecibles y faciles de guardar."
     formato = random.choice(FORMATOS)
     hoy = datetime.date.today().isoformat()
     # Usamos TEMAS solo como "lo obvio a EVITAR", para empujar novedad
@@ -169,13 +156,11 @@ def generate():
     seed = _run_seed()
     prompt = (master
               + f"\n\n---\nTAREA DE HOY ({hoy}):\n"
-              + "ELIGE TU MISMO un tema NUEVO, especifico y original dentro de la tematica "
-                "de ESTE canal (segun las instrucciones de arriba). Sorprendeme con un angulo "
-                "fresco y concreto; evita los topicos mas manidos y ya vistos.\n"
-              + (f"Para forzar variedad, HOY NO trates sobre estos (elige algo distinto): {evitar}.\n" if evitar else "")
-              + f"Desarrollalo con este enfoque/formato: {formato}.\n"
-              + "Debe ser un tema DISTINTO cada dia; se original.\n"
-              + "Cumple TODAS las reglas de arriba (cumplimiento primero, luego viralidad).\n"
+              + "CREA una receta o plato NUEVO, sencillo y apetecible para hoy. "
+                "Elige tu mismo el plato; que de hambre y se quiera guardar.\n"
+              + (f"Para forzar variedad, HOY evita estos tipos de plato (elige otro): {evitar}.\n" if evitar else "")
+              + f"Presentalo con este ESTILO de hoy: {formato}.\n"
+              + "Apertura y cierre VARIADOS (nunca los de ayer); titulo y descripcion UNICOS de hoy. Que HOY se note claramente distinto a cualquier dia anterior. Es una receta apetecible, NO una lista de tips.\n"
               + SCHEMA_INSTRUCCION)
     try:
         raw = _call_gemini(prompt, key)
